@@ -2,41 +2,67 @@
 """
 import asyncio
 import click
+import os
 import requests
+import aiohttp
+from urllib.parse import urljoin
 
 queue_hostname = 'http://localhost:8080/'
 
 
 @click.command()
-@click.argument('inp')
-@click.argument('out')
+@click.argument('inp', type=click.Path(exists=True))
+@click.argument('out', type=click.Path())
 def main(inp, out):
     loop = asyncio.get_event_loop()
+    loop.set_exception_handler(None)
+    path_name = os.path.basename(inp)
+    queue_url = urljoin(queue_hostname, path_name)
     tasks = [
-        asyncio.ensure_future(read_input(inp)),
-        asyncio.ensure_future(write_output(out)),
+        asyncio.ensure_future(read_input(queue_url, inp)),
+        asyncio.ensure_future(write_output(queue_url, out)),
     ]
-    loop.run_until_complete(asyncio.wait(tasks))
+    loop.run_until_complete(asyncio.gather(*tasks))
     loop.close()
 
 
+async def read_input(queue_url, inp):
+    async with aiohttp.ClientSession() as session:
+        print('Using ', queue_url)
+        r = await session.put(queue_url)
+        r.raise_for_status()
+        with open(inp) as f:
+            for l in f:
+                async with session.post(queue_url, data=l) as r:
+                    r.raise_for_status()
+        r = await session.delete(queue_url)
+        r.raise_for_status()
 
-async def read_input(inp):
-    with open(inp) as f:
-        for l in f:
-            r = requests.post(queue_hostname, data=l)
-            r.raise_for_status()
 
-
-async def write_output(out):
+async def write_output(queue_url, out):
     with open(out, 'wb') as f:
-        while True:
-            r = requests.get(queue_hostname)
-            if r.status_code == 200:
-                f.write(r.content)
-            else:
-                print(r)
-                break
+        async with aiohttp.ClientSession() as session:
+            while True:
+                r = await get_line(session, queue_url)
+                if r is None:
+                    break
+                if r == -1:
+                    await asyncio.sleep(0.1)
+                else:
+                    f.write(r)
+
+
+async def get_line(session, queue_url):
+    async with session.get(queue_url) as r:
+        if r.status == 200:
+            return await r.read()
+        elif r.status == requests.codes.GONE:
+            return None
+        elif r.status == requests.codes.no_content:
+            return -1
+        else:
+            print(r)
+            return None
 
 if __name__ == '__main__':
     import logging
