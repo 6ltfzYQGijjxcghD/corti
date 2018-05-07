@@ -3,7 +3,7 @@
 import asyncio
 import click
 import os
-import requests
+import requests  # just for the codes for now
 import aiohttp
 from urllib.parse import urljoin
 
@@ -31,7 +31,7 @@ async def read_input(queue_url, inp):
         print('Using ', queue_url)
         r = await session.put(queue_url)
         r.raise_for_status()
-        with open(inp) as f:
+        with open(inp, 'rb') as f:
             for l in f:
                 async with session.post(queue_url, data=l) as r:
                     r.raise_for_status()
@@ -54,7 +54,7 @@ async def write_output(queue_url, out):
 
 async def get_line(session, queue_url):
     async with session.get(queue_url) as r:
-        if r.status == 200:
+        if r.status == requests.codes.ok:
             return await r.read()
         elif r.status == requests.codes.GONE:
             return None

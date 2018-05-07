@@ -1,0 +1,9 @@
+#!/bin/bash -e
+here=$(realpath `dirname $0`)
+docker run -it --rm \
+    -v $here:/workdir \
+    -w /workdir \
+    --network host \
+    -u $UID:$UID \
+    golang:1 \
+    go run go/src/corti.ai/queue/main.go

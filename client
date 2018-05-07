@@ -1,0 +1,3 @@
+#!/bin/bash -e
+here=`dirname $0`/python
+exec python $here/readerwriter.py $@

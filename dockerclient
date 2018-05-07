@@ -1,0 +1,13 @@
+#!/bin/bash -e
+here=`dirname $0`/python
+p=$(realpath `pwd`)
+echo $p
+exec \
+    docker run -it --rm \
+    -v `realpath $here`:/usr/src/app \
+    -v $p:/mypwd \
+    -w /mypwd \
+    --network host \
+    -u $UID:$UID \
+    corticlient python /usr/src/app/readerwriter.py $@
+
